@@ -26,6 +26,7 @@ common:
 algorithms:
     - name: dx
     - name: memento
+    - name: mads
 
 benchmarks: 
     - name: incremental-lookup-time

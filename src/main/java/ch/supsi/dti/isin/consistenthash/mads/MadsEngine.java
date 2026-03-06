@@ -71,10 +71,10 @@ public class MadsEngine implements BucketBasedEngine {
     public int getBucket(String key) {
         /*
          * We invoke JumpHash to get a bucket
-         * in the range [0,bArraySize-1].
+         * in the range [0,capacity-1].
          */
-        int b = Hashing.consistentHash(hashFunction.hash(key), failed.size());
-        if (failed.get(b)) {
+        int b = Hashing.consistentHash(hashFunction.hash(key), capacity);
+        if (!failed.get(b)) {
             return b;
         }
 
@@ -82,8 +82,9 @@ public class MadsEngine implements BucketBasedEngine {
         b = random.nextInt(capacity);
 
         /* Loop until hitting a working bucket. */
-        while (failed.get(b)) /* Next random in sequence. */
-        b = random.nextInt(capacity);
+        while (failed.get(b) /* Next random in sequence. */) b = random.nextInt(
+            capacity
+        );
 
         return b;
     }
