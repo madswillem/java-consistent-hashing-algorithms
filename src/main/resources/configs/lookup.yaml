@@ -72,13 +72,19 @@ algorithms:
     - name: binomial
             # No arguments
     - name: dx
-    #   args: 
-    #       # Same as above.
-    #       capacity: 10
+      args:
+          # Capacity set to 1 for fair comparison with memento at 0 removals.
+          # This ensures the fast-path lookup succeeds 100% of the time when no nodes are removed.
+          capacity: 1
     - name: jump
     #       # No arguments
     - name: jumpback
           # No arguments
+    - name: mads
+      args:
+          # Capacity set to 1 for fair comparison with memento at 0 removals.
+          # This ensures the fast-path lookup succeeds 100% of the time when no nodes are removed.
+          capacity: 1
     - name: memento
     #       # No arguments
     - name: power
