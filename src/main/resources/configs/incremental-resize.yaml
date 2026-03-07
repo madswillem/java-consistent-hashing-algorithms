@@ -1,0 +1,32 @@
+common:
+    gc: true
+    output-folder: /tmp
+    iterations:
+        warmup: 3
+        execution: 5
+    time:
+        unit: NANOSECONDS
+        mode: AverageTime
+        warmup: 3
+        execution: 5
+    init-nodes: [1024]
+    hash-functions:
+        - xx
+    key-distributions:
+        - uniform
+
+algorithms:
+    - name: dx
+      args:
+          capacity: 1
+    - name: mads
+      args:
+          capacity: 1
+    - name: memento
+
+benchmarks:
+    - name: incremental-resize-time
+      common:
+        init-nodes: [1024]
+      args:
+        removal-rates: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
