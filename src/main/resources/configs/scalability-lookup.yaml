@@ -24,6 +24,7 @@ common:
         - uniform
 
 algorithms:
+    - name: memento
     - name: dx
       args:
           capacity: 1
