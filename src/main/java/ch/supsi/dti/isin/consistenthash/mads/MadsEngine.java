@@ -4,8 +4,10 @@ import ch.supsi.dti.isin.consistenthash.BucketBasedEngine;
 import ch.supsi.dti.isin.hashfunction.HashFunction;
 import com.google.common.hash.Hashing;
 import java.util.BitSet;
-import java.util.LinkedList;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Implementation of the {@code MadsHash} algorithm as described in the related paper:
@@ -33,8 +35,8 @@ public class MadsEngine implements BucketBasedEngine {
      */
     private final BitSet failed;
 
-    /** Keeps track of the removed nodes in reverse order. */
-    private final LinkedList<Integer> removed;
+    /** Keeps track of the removed nodes in insertion order. */
+    private final Set<Integer> removed;
 
     /** Hashing function to use */
     private final HashFunction hashFunction;
@@ -51,7 +53,7 @@ public class MadsEngine implements BucketBasedEngine {
         this.size = size;
         this.capacity = capacity;
 
-        this.removed = new LinkedList<>();
+        this.removed = new LinkedHashSet<>();
         this.hashFunction = hashFunction;
 
         this.failed = new BitSet(capacity);
@@ -96,10 +98,17 @@ public class MadsEngine implements BucketBasedEngine {
      */
     public int addBucket() {
         /*
-         * If the stack is not empty takes the last removed bucket.
+         * If the set is not empty takes the first removed bucket.
          * Otherwise, uses the next available bucket (with index 'size').
          */
-        final int b = removed.isEmpty() ? size : removed.pop();
+        final int b;
+        if (removed.isEmpty()) {
+            b = size;
+        } else {
+            final Iterator<Integer> it = removed.iterator();
+            b = it.next();
+            it.remove();
+        }
         failed.clear(b);
         ++size;
 
@@ -116,7 +125,7 @@ public class MadsEngine implements BucketBasedEngine {
         /* Updates the size of the working set. */
         --size;
         failed.set(b);
-        removed.push(b);
+        removed.add(b);
 
         return b;
     }
