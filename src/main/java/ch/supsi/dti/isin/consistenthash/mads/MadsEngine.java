@@ -4,10 +4,7 @@ import ch.supsi.dti.isin.consistenthash.BucketBasedEngine;
 import ch.supsi.dti.isin.hashfunction.HashFunction;
 import com.google.common.hash.Hashing;
 import java.util.BitSet;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.Random;
-import java.util.Set;
 
 /**
  * Implementation of the {@code MadsHash} algorithm as described in the related paper:
@@ -35,8 +32,8 @@ public class MadsEngine implements BucketBasedEngine {
      */
     private final BitSet failed;
 
-    /** Keeps track of the removed nodes in insertion order. */
-    private final Set<Integer> removed;
+    /** Keeps track of the removed nodes. */
+    private final TinyIntHashSet removed;
 
     /** Hashing function to use */
     private final HashFunction hashFunction;
@@ -53,7 +50,7 @@ public class MadsEngine implements BucketBasedEngine {
         this.size = size;
         this.capacity = capacity;
 
-        this.removed = new LinkedHashSet<>();
+        this.removed = new TinyIntHashSet();
         this.hashFunction = hashFunction;
 
         this.failed = new BitSet(capacity);
@@ -98,16 +95,14 @@ public class MadsEngine implements BucketBasedEngine {
      */
     public int addBucket() {
         /*
-         * If the set is not empty takes the first removed bucket.
+         * If the set is not empty takes the first bucket found in it.
          * Otherwise, uses the next available bucket (with index 'size').
          */
         final int b;
         if (removed.isEmpty()) {
             b = size;
         } else {
-            final Iterator<Integer> it = removed.iterator();
-            b = it.next();
-            it.remove();
+            b = removed.poll();
         }
         failed.clear(b);
         ++size;

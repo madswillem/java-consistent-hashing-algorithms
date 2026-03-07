@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +97,44 @@ public class MadsEngineTests
         final int bucket = engine.addBucket();
 
         assertEquals( removed, bucket );
+
+    }
+
+    @Test
+    public void adding_after_multiple_removals_should_restore_one_of_the_removed_buckets()
+    {
+
+        final int size = random.nextInt( 100 ) + 3;
+        final MadsEngine engine = new MadsEngine( size, size << 1, ConsistentHash.DEFAULT_HASH_FUNCTION );
+        final List<Integer> removed = IntStream.range( 0, size ).boxed().collect( toList() );
+
+        Collections.shuffle( removed );
+        final List<Integer> toRemove = removed.subList( 0, 3 );
+        toRemove.forEach( engine::removeBucket );
+
+        final int bucket = engine.addBucket();
+        assertTrue( toRemove.contains( bucket ) );
+
+    }
+
+    @Test
+    public void adding_after_multiple_removals_should_restore_all_removed_buckets_without_duplicates()
+    {
+
+        final int size = random.nextInt( 100 ) + 5;
+        final MadsEngine engine = new MadsEngine( size, size << 1, ConsistentHash.DEFAULT_HASH_FUNCTION );
+        final List<Integer> buckets = IntStream.range( 0, size ).boxed().collect( toList() );
+
+        Collections.shuffle( buckets );
+        final List<Integer> removed = buckets.subList( 0, 4 );
+        removed.forEach( engine::removeBucket );
+
+        final HashSet<Integer> restored = new HashSet<>();
+        for( int i = 0; i < removed.size(); ++i )
+            restored.add( engine.addBucket() );
+
+        assertEquals( removed.size(), restored.size() );
+        assertTrue( restored.containsAll( removed ) );
 
     }
 
@@ -252,7 +291,7 @@ public class MadsEngineTests
 
 
     @Test
-    @Disabled("FIFO behavior does not guarantee keys return to previous buckets like LIFO")
+    @Disabled("Set-based restore does not guarantee keys return to previous buckets")
     public void when_nodes_are_restored_keys_shoud_return_to_the_previous_bucket()
     {
 
