@@ -15,7 +15,7 @@ common:
         warmup: 1
         execution: 3
 
-    init-nodes: [1024]
+    init-nodes: [1024,8192,131072,1,048,576]
 
     hash-functions:
         - xx

@@ -38,7 +38,7 @@ import ch.supsi.dti.isin.key.KeyGenerator;
  * This version of the lookup time benchmark fixes the size of the cluster
  * and increases the rate of removed nodes.
  * 
- * @author Massimo Coluzzi
+ * @author Mads Leonardi
  */
 public class IncrementalLookupTime extends BenchmarkExecutor
 {
