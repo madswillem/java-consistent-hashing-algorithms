@@ -97,12 +97,7 @@ public class MadsEngine implements BucketBasedEngine {
          * If the set is not empty takes the first bucket found in it.
          * Otherwise, uses the next available bucket (with index 'size').
          */
-        final int b;
-        if (removed.isEmpty()) {
-            b = size;
-        } else {
-            b = removed.poll();
-        }
+        final int b = removed.isEmpty() ? size : removed.poll();
         failed.clear(b);
         ++size;
 

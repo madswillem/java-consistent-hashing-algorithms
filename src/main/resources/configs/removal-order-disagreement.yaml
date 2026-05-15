@@ -1,0 +1,25 @@
+# Configurations that will apply to every benchmark.
+common:
+  gc: true
+  output-folder: /tmp/removal-order-disagreement
+  init-nodes: [1024]
+  hash-functions:
+    - xx
+
+algorithms:
+  - name: anchor
+    args:
+      capacity: 1
+  - name: memento
+
+benchmarks:
+  - name: removal-order-disagreement
+    args:
+      # Fraction of initial nodes to remove before comparing mappings.
+      removal-rate: 0.75
+      # Fraction of the removal list shuffled at each tested start index.
+      window-distance: 0.5
+      # Number of deterministic record IDs used for mapping comparison.
+      record-count: 100000
+      # Seed used to choose removed nodes and generate variant orders.
+      seed: 0

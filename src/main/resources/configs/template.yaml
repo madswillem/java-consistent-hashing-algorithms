@@ -222,6 +222,27 @@ benchmarks:
         # The benchmark will run for every specified value.
         fractions: [0.1, 0.3, 0.5]
 
+    # Measures disagreement caused by removing the same nodes in different orders.
+    # This benchmark runs only algorithms that support arbitrary node removal order.
+    - name: removal-order-disagreement
+      # Can be used to override any common configuration.
+      common:
+        init-nodes: [1024]
+      # Used to define any benchmark specific argument.
+      args:
+        # A number 0 <= x < 1 defining the percentage of initial nodes to remove.
+        # Default value is 0.75.
+        removal-rate: 0.75
+        # A number 0 <= x <= 1 defining the fraction of the removal order to shuffle
+        # at each tested start index. Default value is 0.5.
+        window-distance: 0.5
+        # Number of deterministic record IDs used to compare mappings.
+        # Default value is 100000.
+        record-count: 100000
+        # Seed used to choose removed nodes and generate variant orders.
+        # Default value is 0.
+        seed: 0
+
         # Benchmarks the time needed to find which node a given key belongs.
     # This version keeps the cluster size fixed and incrementally removes the nodes.
     - name: incremental-lookup-time

@@ -71,8 +71,8 @@ common:
     # Benchmarks will run for every specified key distribution.
     key-distributions:
     # - custom
-    - uniform
-    # - normal
+    #- uniform
+     - normal
 
 # List of algorithms to be benchmarked. The list shows the currently implemented CH algorithms.
 # If you add an algorithm called MyAlgo, the tool will search for a class named "MyAlgoFactory"
@@ -85,13 +85,13 @@ algorithms:
     #       # E.g., capacity=10 means that the overall capacity of the cluster is 10 times the initial number of working nodes.
     #       # Default value for the capacity is 10.
     #       capacity: 10
-    - name: binomial
+    # - name: binomial
             # No arguments
-    # - name: dx
-    #   args: 
-    #       # Same as above.
-    #       capacity: 10
-    - name: jump
+     - name: mads
+       args: 
+           # Same as above.
+           capacity: 1
+    # - name: jump
     #       # No arguments
     # - name: jumpback
           # No arguments
@@ -177,7 +177,7 @@ benchmarks:
         removal-order: random 
         # The benchmark will be executed over a number of keys that is calculated by: keyMultiplier * cluster-nodes.
         # Default value is 100.
-        key-multiplier: 1000
+        key-multiplier: 10000
   
     # Benchmarks the distribution of the keys among the nodes of the cluster after a resize.
     # - name: resize-balance
