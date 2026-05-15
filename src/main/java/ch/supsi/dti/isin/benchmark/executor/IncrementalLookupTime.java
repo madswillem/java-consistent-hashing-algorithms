@@ -187,7 +187,6 @@ public class IncrementalLookupTime extends BenchmarkExecutor
         @Setup
         public void setup( JMHConfigWrapper wrapper )
         {
-            
             final AlgorithmConfig algorithmConfig = BenchmarkExecutionUtils.getAlgorithmConfig( wrapper.getConfig(), algorithm );
             
             final ConsistentHashFactory factory = BenchmarkExecutionUtils.getFactory( algorithmConfig );

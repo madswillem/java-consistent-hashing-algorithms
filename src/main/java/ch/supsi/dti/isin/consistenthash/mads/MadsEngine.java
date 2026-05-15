@@ -15,8 +15,7 @@ import java.util.Random;
  * This class is not performing any consistency check
  * to avoid the performance tests to be falsified.
  *
- * @author Massimo Coluzzi
- * @author Davide Bertacco
+ * @author Mads Leonardi
  */
 public class MadsEngine implements BucketBasedEngine {
 
