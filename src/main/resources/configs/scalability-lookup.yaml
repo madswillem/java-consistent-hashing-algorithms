@@ -2,37 +2,58 @@
 # Tests lookup performance from 0% to 99% node removal with 1024 nodes
 
 common:
-    gc: true
-    output-folder: /tmp
+  gc: true
+  output-folder: /tmp
 
-    iterations:
-        warmup: 1
-        execution: 3
+  iterations:
+    warmup: 1
+    execution: 3
 
-    time:
-        unit: NANOSECONDS
-        mode: AverageTime
-        warmup: 1
-        execution: 3
+  time:
+    unit: NANOSECONDS
+    mode: AverageTime
+    warmup: 1
+    execution: 3
 
-    init-nodes: [1024,8192,131072,1,048,576]
+  init-nodes: [1_024, 8_192, 131_072, 1_048_576]
 
-    hash-functions:
-        - xx
+  hash-functions:
+    - xx
 
-    key-distributions:
-        - uniform
+  key-distributions:
+    - uniform
 
 algorithms:
-    - name: memento
-    - name: dx
-      args:
-          capacity: 1
-    - name: mads
-      args:
-          capacity: 1
+  - name: memento
+  - name: dx
+    args:
+      capacity: 1
+  - name: mads
+    args:
+      capacity: 1
 
-benchmarks: 
-    - name: incremental-lookup-time
-      args:
-          removal-rates: [0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
+benchmarks:
+  - name: incremental-lookup-time
+    args:
+      init-nodes: [1_024, 8_192, 131_072, 1_048_576]
+      removal-rates:
+        [
+          0,
+          0.05,
+          0.10,
+          0.15,
+          0.20,
+          0.25,
+          0.30,
+          0.35,
+          0.40,
+          0.45,
+          0.50,
+          0.55,
+          0.60,
+          0.65,
+          0.70,
+          0.75,
+          0.80,
+          0.85,
+        ]
