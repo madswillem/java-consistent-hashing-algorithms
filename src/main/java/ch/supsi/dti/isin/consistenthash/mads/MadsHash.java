@@ -1,6 +1,8 @@
 package ch.supsi.dti.isin.consistenthash.mads;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.nerd4j.utils.lang.Require;
 
@@ -16,19 +18,22 @@ import ch.supsi.dti.isin.hashfunction.HashFunction;
  * This wrapper performs all the consistency checks.
  *
  *
- * @author Massimo Coluzzi
+ * @author Mads Leonardi
  */
 public class MadsHash implements ConsistentHash
 {
 
     /**
      * The {@code MadsHash} algorithm engine as described in:
-     * {@code https://arxiv.org/pdf/2107.07930.pdf}
+     * 
      */
     private final MadsEngine engine;
 
     /** One-to-one mapping between a node and the related bucket. */
     private final Indirection indirection;
+
+    /** Buckets previously assigned to removed nodes. */
+    private final Map<Node,Integer> removedBuckets;
 
 
     /**
@@ -60,16 +65,17 @@ public class MadsHash implements ConsistentHash
         Require.toHold( nodes.size() <= capacity, "The cluster overall capacity cannot be smaller than the number of working nodes" );
         
         this.engine = new MadsEngine(
-            0, capacity, Require.nonNull( hashFunction, "The hash function to use cannot be null" )
+            nodes.size(), nodes.size(), Require.nonNull( hashFunction, "The hash function to use cannot be null" )
         );
 
         this.indirection = new Indirection( nodes.size() );
-        
+        this.removedBuckets = new HashMap<>();
+
+        int bucket = 0;
         for ( Node node : nodes )
         {
-            
-            final int bucket = engine.addBucket();
             indirection.put( node, bucket );
+            ++bucket;
 
         }
 
@@ -103,11 +109,11 @@ public class MadsHash implements ConsistentHash
     {
 
         Require.nonEmpty( toAdd, "The resources to add are mandatory" );
-        Require.toHold( engine.size() + toAdd.size() <= engine.capacity(), "No room for more resources" );
         for( Node node : toAdd )
         {
 
-            final int bucket = engine.addBucket();
+            final Integer removedBucket = removedBuckets.remove( node );
+            final int bucket = removedBucket != null ? engine.addBucket( removedBucket ) : engine.addBucket();
 
             try{
 
@@ -117,6 +123,8 @@ public class MadsHash implements ConsistentHash
             {
 
                 engine.removeBucket( bucket );
+                if( removedBucket != null )
+                    removedBuckets.put( node, removedBucket );
                 throw ex;
                 
             }
@@ -139,6 +147,7 @@ public class MadsHash implements ConsistentHash
         {
             
             final int bucket = indirection.remove( node );
+            removedBuckets.put( node, bucket );
             engine.removeBucket( bucket );
 
         }

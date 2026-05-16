@@ -5,6 +5,7 @@ import ch.supsi.dti.isin.hashfunction.HashFunction;
 import com.google.common.hash.Hashing;
 import java.util.BitSet;
 import java.util.Random;
+import java.util.TreeSet;
 
 /**
  * Implementation of the {@code MadsHash} algorithm as described in the related paper:
@@ -32,7 +33,7 @@ public class MadsEngine implements BucketBasedEngine {
     private final BitSet failed;
 
     /** Keeps track of the removed nodes. */
-    private final TinyIntHashSet removed;
+    private final TreeSet<Integer> removed;
 
     /** Hashing function to use */
     private final HashFunction hashFunction;
@@ -49,7 +50,7 @@ public class MadsEngine implements BucketBasedEngine {
         this.size = size;
         this.capacity = capacity;
 
-        this.removed = new TinyIntHashSet();
+        this.removed = new TreeSet<>();
         this.hashFunction = hashFunction;
 
         this.failed = new BitSet(capacity);
@@ -97,8 +98,30 @@ public class MadsEngine implements BucketBasedEngine {
          * If the set is not empty takes the first bucket found in it.
          * Otherwise, uses the next available bucket (with index 'size').
          */
-        final int b = removed.isEmpty() ? size : removed.poll();
+        final int b;
+        if (removed.isEmpty()) {
+            b = size;
+            ++capacity;
+        } else {
+            b = removed.pollFirst();
+        }
+
         failed.clear(b);
+        ++size;
+
+        return b;
+    }
+
+    /**
+     * Adds the given bucket back to the engine.
+     *
+     * @param b index of the bucket to add
+     * @return the added bucket
+     */
+    public int addBucket(int b) {
+        failed.clear(b);
+        removed.remove(b);
+        capacity = capacity > b ? capacity : b + 1;
         ++size;
 
         return b;
@@ -111,6 +134,14 @@ public class MadsEngine implements BucketBasedEngine {
      * @return the removed bucket
      */
     public int removeBucket(int b) {
+        if (removed.isEmpty() && b == capacity - 1) {
+            --size;
+            failed.clear(b);
+            --capacity;
+
+            return b;
+        }
+
         /* Updates the size of the working set. */
         --size;
         failed.set(b);

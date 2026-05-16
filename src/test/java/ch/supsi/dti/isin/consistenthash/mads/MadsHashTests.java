@@ -2,11 +2,14 @@ package ch.supsi.dti.isin.consistenthash.mads;
 
 import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -119,7 +122,7 @@ public class MadsHashTests implements ConsistentHashContract<MadsHash>
     }
 
     @Test
-    public void adding_nodes_cannot_exceed_capacity()
+    public void adding_nodes_can_grow_beyond_the_initial_capacity()
     {
 
         final List<Node> nodes = IntStream.of( 1, 2, 3, 4, 5 )
@@ -129,7 +132,31 @@ public class MadsHashTests implements ConsistentHashContract<MadsHash>
         final MadsHash madsHash = sampleValue( nodes, 6 );
         
         assertDoesNotThrow( () -> madsHash.addNodes( Collections.singleton(SimpleNode.of(100))) );
-        assertThrows( RequirementFailure.class, () -> madsHash.addNodes(Collections.singleton(SimpleNode.of(101))) );
+        assertDoesNotThrow( () -> madsHash.addNodes(Collections.singleton(SimpleNode.of(101))) );
+        assertEquals( 7, madsHash.nodeCount() );
+
+    }
+
+    @Test
+    public void restored_nodes_should_keep_their_previous_buckets()
+    {
+
+        final List<Node> nodes = SimpleNode.create( 100 );
+        final MadsHash madsHash = sampleValue( nodes, 200 );
+        final List<String> keys = IntStream.range( 0, 1000 ).mapToObj( String::valueOf ).collect( toList() );
+        final List<Node> removed = IntStream.iterate( 99, i -> i - 1 ).limit( 50 ).mapToObj( SimpleNode::of ).collect( toList() );
+
+        final Map<String,Node> before = new HashMap<>();
+        for( String key : keys )
+            before.put( key, madsHash.getNode( key ) );
+
+        madsHash.removeNodes( removed );
+
+        Collections.reverse( removed );
+        madsHash.addNodes( removed );
+
+        for( String key : keys )
+            assertEquals( before.get( key ), madsHash.getNode( key ) );
 
     }
 

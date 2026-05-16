@@ -21,7 +21,6 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Disabled;
 
 import ch.supsi.dti.isin.consistenthash.ConsistentHash;
 
@@ -57,7 +56,7 @@ public class MadsEngineTests
 
 
     @Test
-    public void adding_a_new_bucket_should_change_the_size_but_not_the_capacity()
+    public void adding_a_new_bucket_without_removed_buckets_should_change_the_size_and_capacity()
     {
 
         final int size = random.nextInt( 100 ) + 1;
@@ -67,7 +66,7 @@ public class MadsEngineTests
         engine.addBucket();
 
         assertEquals( size + 1, engine.size() );
-        assertEquals( capacity, engine.capacity() );
+        assertEquals( capacity + 1, engine.capacity() );
 
     }
 
@@ -97,6 +96,40 @@ public class MadsEngineTests
         final int bucket = engine.addBucket();
 
         assertEquals( removed, bucket );
+
+    }
+
+    @Test
+    public void adding_a_removed_bucket_should_change_the_size_but_not_the_capacity()
+    {
+
+        final int size = random.nextInt( 100 ) + 1;
+        final int capacity = size << 1;
+        final int toRemove = random.nextInt( size );
+
+        final MadsEngine engine = new MadsEngine( size, capacity, ConsistentHash.DEFAULT_HASH_FUNCTION );
+        engine.removeBucket( toRemove );
+        engine.addBucket();
+
+        assertEquals( size, engine.size() );
+        assertEquals( capacity, engine.capacity() );
+
+    }
+
+    @Test
+    public void restoring_a_removed_tail_bucket_should_expand_capacity_back_to_that_bucket()
+    {
+
+        final int size = random.nextInt( 100 ) + 2;
+        final int capacity = size << 1;
+        final int removed = capacity - 1;
+
+        final MadsEngine engine = new MadsEngine( size, capacity, ConsistentHash.DEFAULT_HASH_FUNCTION );
+        engine.removeBucket( removed );
+        engine.addBucket( removed );
+
+        assertEquals( size, engine.size() );
+        assertEquals( capacity, engine.capacity() );
 
     }
 
@@ -138,6 +171,21 @@ public class MadsEngineTests
 
     }
 
+    @Test
+    public void adding_after_multiple_removals_should_restore_removed_buckets_in_ascending_order()
+    {
+
+        final MadsEngine engine = new MadsEngine( 10, 20, ConsistentHash.DEFAULT_HASH_FUNCTION );
+        final List<Integer> removed = List.of( 7, 2, 5, 1 );
+        removed.forEach( engine::removeBucket );
+
+        assertEquals( 1, engine.addBucket() );
+        assertEquals( 2, engine.addBucket() );
+        assertEquals( 5, engine.addBucket() );
+        assertEquals( 7, engine.addBucket() );
+
+    }
+
 
     @Test
     public void removing_an_existing_bucket_should_change_the_size_of_the_working_set()
@@ -155,7 +203,7 @@ public class MadsEngineTests
 
 
     @Test
-    public void removing_an_existing_bucket_should_not_reduce_the_capacity()
+    public void removing_a_non_last_bucket_should_not_reduce_the_capacity()
     {
 
         final int size = random.nextInt( 100 ) + 1;
@@ -166,6 +214,21 @@ public class MadsEngineTests
         engine.removeBucket( toRemove );
 
         assertEquals( capacity, engine.capacity() );
+
+    }
+
+    @Test
+    public void removing_the_last_bucket_with_no_removed_buckets_should_reduce_size_and_capacity()
+    {
+
+        final int size = random.nextInt( 100 ) + 2;
+        final int capacity = size << 1;
+
+        final MadsEngine engine = new MadsEngine( size, capacity, ConsistentHash.DEFAULT_HASH_FUNCTION );
+        engine.removeBucket( capacity - 1 );
+
+        assertEquals( size - 1, engine.size() );
+        assertEquals( capacity - 1, engine.capacity() );
 
     }
 
@@ -291,7 +354,6 @@ public class MadsEngineTests
 
 
     @Test
-    @Disabled("Set-based restore does not guarantee keys return to previous buckets")
     public void when_nodes_are_restored_keys_shoud_return_to_the_previous_bucket()
     {
 
@@ -312,16 +374,16 @@ public class MadsEngineTests
             recordKeyPositions( keys, i, map, engine );
         }
 
-        for( int i = 0; i < removed; ++i )
+        for( int i = removed - 1; i >= 0; --i )
         {
 
-            final int restored = engine.addBucket();
+            final int restored = engine.addBucket( nodes.get(i) );
             assertEquals( nodes.get(i), restored );
 
             for( String key : keys )
             {
 
-                final int previous = map.get( key )[removed - i];
+                final int previous = map.get( key )[i];
                 final int current = engine.getBucket( key );
 
                 assertEquals( previous, current );
