@@ -13,6 +13,7 @@ common:
 algorithms:
     - name: dx
     - name: memento
+    - name: anchor
     - name: mads
 
 benchmarks: 

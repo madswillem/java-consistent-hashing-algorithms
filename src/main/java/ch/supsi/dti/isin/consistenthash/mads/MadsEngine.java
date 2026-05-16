@@ -5,7 +5,6 @@ import ch.supsi.dti.isin.hashfunction.HashFunction;
 import com.google.common.hash.Hashing;
 import java.util.BitSet;
 import java.util.Random;
-import java.util.TreeSet;
 
 /**
  * Implementation of the {@code MadsHash} algorithm as described in the related paper:
@@ -33,7 +32,7 @@ public class MadsEngine implements BucketBasedEngine {
     private final BitSet failed;
 
     /** Keeps track of the removed nodes. */
-    private final TreeSet<Integer> removed;
+    private final RemovedBuckets removed;
 
     /** Hashing function to use */
     private final HashFunction hashFunction;
@@ -46,11 +45,23 @@ public class MadsEngine implements BucketBasedEngine {
      * @param hashFunction the hash function to use
      */
     public MadsEngine(int size, int capacity, HashFunction hashFunction) {
+        this(size, capacity, hashFunction, new TreeSetRemovedBuckets());
+    }
+
+    /**
+     * Constructor with parameters.
+     *
+     * @param size          initial cluster nodes
+     * @param capacity      overall number of available buckets
+     * @param hashFunction  the hash function to use
+     * @param removed       removed buckets tracker
+     */
+    public MadsEngine(int size, int capacity, HashFunction hashFunction, RemovedBuckets removed) {
         super();
         this.size = size;
         this.capacity = capacity;
 
-        this.removed = new TreeSet<>();
+        this.removed = removed;
         this.hashFunction = hashFunction;
 
         this.failed = new BitSet(capacity);
@@ -103,7 +114,7 @@ public class MadsEngine implements BucketBasedEngine {
             b = size;
             ++capacity;
         } else {
-            b = removed.pollFirst();
+            b = removed.pollNext();
         }
 
         failed.clear(b);
