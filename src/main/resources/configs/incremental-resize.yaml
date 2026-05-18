@@ -2,14 +2,14 @@ common:
     gc: true
     output-folder: /tmp
     iterations:
-        warmup: 5
-        execution: 10
+        warmup: 3
+        execution: 7
     time:
         unit: NANOSECONDS
         mode: AverageTime
-        warmup: 5
-        execution: 10
-    init-nodes: [1_024, 8_192, 131_072, 1_048_576]
+        warmup: 3
+        execution: 7
+    init-nodes: [1_024]
     hash-functions:
         - xx
     key-distributions:
