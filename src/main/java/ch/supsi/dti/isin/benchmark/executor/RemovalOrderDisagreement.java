@@ -1,8 +1,5 @@
 package ch.supsi.dti.isin.benchmark.executor;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,11 +10,30 @@ import java.util.Random;
 import java.util.logging.Logger;
 import java.util.stream.IntStream;
 
+import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.Param;
+import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.Setup;
+import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.results.format.ResultFormatType;
+import org.openjdk.jmh.runner.Runner;
+import org.openjdk.jmh.runner.RunnerException;
+import org.openjdk.jmh.runner.options.Options;
+import org.openjdk.jmh.runner.options.OptionsBuilder;
+
+import ch.supsi.dti.isin.benchmark.adapter.HashFunctionLoader;
+import ch.supsi.dti.isin.benchmark.config.AlgorithmConfig;
 import ch.supsi.dti.isin.benchmark.adapter.ConsistentHashFactory;
 import ch.supsi.dti.isin.benchmark.config.BenchmarkConfig;
+import ch.supsi.dti.isin.benchmark.config.CommonConfig;
 import ch.supsi.dti.isin.benchmark.config.ConfigUtils;
 import ch.supsi.dti.isin.benchmark.config.InconsistentValueException;
 import ch.supsi.dti.isin.benchmark.config.InvalidTypeException;
+import ch.supsi.dti.isin.benchmark.config.IterationsConfig;
+import ch.supsi.dti.isin.benchmark.config.JMHConfigWrapper;
+import ch.supsi.dti.isin.benchmark.config.MissingValueException;
+import ch.supsi.dti.isin.benchmark.config.TimeConfig;
 import ch.supsi.dti.isin.benchmark.config.ValuePath;
 import ch.supsi.dti.isin.cluster.Node;
 import ch.supsi.dti.isin.cluster.SimpleNode;
@@ -46,11 +62,11 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
     /** Default random seed used for reproducible node-order generation. */
     public static final long DEFAULT_SEED = 0L;
 
-    /** Fraction of initial nodes to remove. */
-    private final float removalRate;
+    /** Fractions of initial nodes to remove. */
+    private final String[] removalRates;
 
-    /** Fraction of the removal list to shuffle at each index. */
-    private final float windowDistance;
+    /** Fractions of the removal list to shuffle at each index. */
+    private final String[] windowDistances;
 
     /** Number of records used to measure disagreement. */
     private final int recordCount;
@@ -69,8 +85,8 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
 
         super( config );
 
-        this.removalRate = getPercentage( "removalrate", DEFAULT_REMOVAL_RATE );
-        this.windowDistance = getPercentageInclusive( "windowdistance", DEFAULT_WINDOW_DISTANCE );
+        this.removalRates = getPercentages( "removalrate", DEFAULT_REMOVAL_RATE, false );
+        this.windowDistances = getPercentages( "windowdistance", DEFAULT_WINDOW_DISTANCE, true );
         this.recordCount = getPositiveInt( "recordcount", DEFAULT_RECORD_COUNT );
         this.seed = getLong( "seed", DEFAULT_SEED );
 
@@ -89,7 +105,49 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
     protected void performBenchmak( List<ConsistentHashFactory> factories ) throws Exception
     {
 
-        runAndWriteMetrics( factories );
+        final Path file = BenchmarkExecutionUtils.getOutputFile( config );
+
+        final CommonConfig common = config.getCommon();
+        final TimeConfig time = common.getTime();
+        final IterationsConfig iterations = common.getIterations();
+
+        final Options opt = new OptionsBuilder()
+            .include( RemovalOrderDisagreement.RemovalOrderDisagreementExecutor.class.getCanonicalName() )
+
+            .param( "benchmark", config.getName() )
+            .param( "function", BenchmarkExecutionUtils.getHashFunctionNames(config) )
+            .param( "initNodes", BenchmarkExecutionUtils.getInitNodes(config) )
+            .param( "algorithm", BenchmarkExecutionUtils.getAlgorithms(factories) )
+            .param( "removalRate", removalRates )
+            .param( "windowDistance", windowDistances )
+            .param( "recordCount", String.valueOf(recordCount) )
+            .param( "seed", String.valueOf(seed) )
+
+            .resultFormat( ResultFormatType.CSV )
+            .result( file.toString() )
+
+            .shouldDoGC( common.isGc() )
+            .forks( 1 )
+
+            .mode( Mode.AverageTime )
+            .timeUnit( time.getUnit() )
+            .warmupTime( time.getWarmup() )
+            .measurementTime( time.getExecution() )
+            .warmupIterations( iterations.getWarmup() )
+            .measurementIterations( iterations.getExecution() )
+
+            .build();
+
+        try{
+
+            new Runner( opt ).run();
+
+        }catch( RunnerException ex )
+        {
+
+            throw BenchmarkExecutionException.of( ex );
+
+        }
 
     }
 
@@ -154,86 +212,6 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
 
 
     /**
-     * Runs the benchmark and writes the results.
-     *
-     * @param factories the algorithms to benchmark
-     * @throws IOException if an error occurred while writing results on file
-     */
-    private void runAndWriteMetrics( List<ConsistentHashFactory> factories ) throws IOException
-    {
-
-        final Path file = BenchmarkExecutionUtils.getOutputFile( config );
-        try( final BufferedWriter writer = Files.newBufferedWriter(file) )
-        {
-
-            final List<String> records = generateRecords( recordCount );
-            final List<HashFunction> functions = BenchmarkExecutionUtils.getHashFunctions( config );
-
-            printHeader( writer );
-            for( HashFunction function : functions )
-                for( ConsistentHashFactory factory : factories )
-                    for( int nodesCount : config.getCommon().getInitNodes() )
-                    {
-
-                        if( config.getCommon().isGc() )
-                            System.gc();
-
-                        runAndWriteMetrics( writer, function, factory, nodesCount, records );
-                        writer.flush();
-
-                    }
-
-        }
-
-    }
-
-    /**
-     * Runs the benchmark for a single hash function, algorithm, and node count.
-     *
-     * @param writer writer used to persist metrics
-     * @param function hash function to use
-     * @param factory algorithm factory to benchmark
-     * @param nodesCount initial number of nodes
-     * @param records records to compare
-     * @throws IOException if writing fails
-     */
-    private void runAndWriteMetrics(
-        BufferedWriter writer, HashFunction function, ConsistentHashFactory factory,
-        int nodesCount, List<String> records
-    ) throws IOException
-    {
-
-        final String algorithm = factory.getConfig().getName();
-        final List<Node> initNodes = SimpleNode.create( nodesCount );
-        final ConsistentHash probe = factory.createConsistentHash( function, initNodes );
-
-        if( probe.supportsOnlyLifoRemovals() )
-        {
-            logger.info( "Skipping " + algorithm + " because it only supports LIFO removals" );
-            return;
-        }
-
-        final int removedNodesCount = (int)( nodesCount * removalRate );
-        if( removedNodesCount <= 0 )
-            return;
-
-        final Random random = new Random( seed );
-        final List<Node> droppedNodes = sampleNodes( initNodes, removedNodesCount, random );
-        final Map<Integer,List<Node>> variants = generateRemovalOrders( droppedNodes, windowDistance, random );
-
-        for( Map.Entry<Integer,List<Node>> variant : variants.entrySet() )
-        {
-
-            final Metrics metrics = collectMetrics(
-                function, factory, initNodes, droppedNodes, variant.getKey(), variant.getValue(), records
-            );
-            printMetrics( writer, metrics );
-
-        }
-
-    }
-
-    /**
      * Returns a random sample of nodes preserving the shuffled order.
      *
      * @param nodes source nodes
@@ -241,7 +219,7 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
      * @param random random generator to use
      * @return sampled nodes
      */
-    private static List<Node> sampleNodes( List<Node> nodes, int count, Random random )
+    static List<Node> sampleNodes( List<Node> nodes, int count, Random random )
     {
 
         final List<Node> sample = new ArrayList<>( nodes );
@@ -262,9 +240,10 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
      * @param records records to compare
      * @return collected metrics
      */
-    private Metrics collectMetrics(
+    private static Metrics collectMetrics(
         HashFunction function, ConsistentHashFactory factory, List<Node> initNodes,
-        List<Node> baselineOrder, int index, List<Node> variantOrder, List<String> records
+        List<Node> baselineOrder, float removalRate, float windowDistance, int index, List<Node> variantOrder,
+        List<String> records
     )
     {
 
@@ -307,53 +286,6 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
     }
 
     /**
-     * Prints the CSV header.
-     *
-     * @param writer the writer to use
-     * @throws IOException if the writer fails
-     */
-    private static void printHeader( BufferedWriter writer ) throws IOException
-    {
-
-        writer.write( "HashFunction,Algorithm,Nodes,RemovedNodes,RecordCount,RemovalRate,WindowDistance,Index,Mismatches,FailureRate" );
-        writer.newLine();
-
-    }
-
-    /**
-     * Prints the collected metrics in CSV format.
-     *
-     * @param writer writer to use
-     * @param metrics metrics to print
-     * @throws IOException if writing fails
-     */
-    private static void printMetrics( BufferedWriter writer, Metrics metrics ) throws IOException
-    {
-
-        writer.write( metrics.function );
-        writer.write( ',' );
-        writer.write( metrics.algorithm );
-        writer.write( ',' );
-        writer.write( String.valueOf(metrics.nodes) );
-        writer.write( ',' );
-        writer.write( String.valueOf(metrics.removedNodes) );
-        writer.write( ',' );
-        writer.write( String.valueOf(metrics.recordCount) );
-        writer.write( ',' );
-        writer.write( String.valueOf(metrics.removalRate) );
-        writer.write( ',' );
-        writer.write( String.valueOf(metrics.windowDistance) );
-        writer.write( ',' );
-        writer.write( String.valueOf(metrics.index) );
-        writer.write( ',' );
-        writer.write( String.valueOf(metrics.mismatches) );
-        writer.write( ',' );
-        writer.write( String.valueOf(metrics.failureRate()) );
-        writer.newLine();
-
-    }
-
-    /**
      * Reads an integer argument that must be greater than zero.
      *
      * @param property normalized property name
@@ -382,46 +314,41 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
      * @param defaultValue default value
      * @return configured value or default
      */
-    private float getPercentage( String property, float defaultValue )
+    private String[] getPercentages( String property, float defaultValue, boolean inclusive )
     {
 
         final Object value = config.getArgs().get( property );
         if( value == null )
-            return defaultValue;
+            return new String[]{ String.valueOf(defaultValue) };
 
         final ValuePath path = config.getPath().append( "args" ).append( property );
-        if( ! (value instanceof Number) )
-            throw InvalidTypeException.of( path, value, Number.class );
+        if( ! (value instanceof List) )
+            throw InvalidTypeException.of( path, value, List.class );
 
-        final float result = ((Number) value).floatValue();
-        if( result < 0 || result >= 1 )
-            throw InconsistentValueException.notAPercentage( path, result );
+        @SuppressWarnings("unchecked")
+        final List<Object> values = (List<Object>) value;
+        if( values.isEmpty() )
+            return new String[]{ String.valueOf(defaultValue) };
 
-        return result;
+        final String[] result = new String[values.size()];
+        for( int i = 0; i < values.size(); ++i )
+        {
 
-    }
+            final ValuePath itemPath = path.append( i );
+            final Object item = values.get( i );
+            if( item == null )
+                throw MissingValueException.of( itemPath );
 
-    /**
-     * Reads a percentage argument in range [0,1].
-     *
-     * @param property normalized property name
-     * @param defaultValue default value
-     * @return configured value or default
-     */
-    private float getPercentageInclusive( String property, float defaultValue )
-    {
+            if( ! (item instanceof Number) )
+                throw InvalidTypeException.of( itemPath, item, Number.class );
 
-        final Object value = config.getArgs().get( property );
-        if( value == null )
-            return defaultValue;
+            final float percentage = ((Number) item).floatValue();
+            if( percentage < 0 || (inclusive ? percentage > 1 : percentage >= 1) )
+                throw InconsistentValueException.notAPercentage( itemPath, percentage );
 
-        final ValuePath path = config.getPath().append( "args" ).append( property );
-        if( ! (value instanceof Number) )
-            throw InvalidTypeException.of( path, value, Number.class );
+            result[i] = String.valueOf( percentage );
 
-        final float result = ((Number) value).floatValue();
-        if( result < 0 || result > 1 )
-            throw InconsistentValueException.notAPercentage( path, result );
+        }
 
         return result;
 
@@ -446,6 +373,140 @@ public class RemovalOrderDisagreement extends BenchmarkExecutor
             throw InvalidTypeException.of( path, value, Number.class );
 
         return ((Number) value).longValue();
+
+    }
+
+
+    /* *************** */
+    /*  INNER CLASSES  */
+    /* *************** */
+
+
+    /** Inner class that executes the benchmark through JMH. */
+    @State(Scope.Benchmark)
+    public static class RemovalOrderDisagreementExecutor
+    {
+
+        /** Name of the current benchmark. */
+        @Param({})
+        private String benchmark;
+
+        /** Number of nodes used to initialize the cluster. */
+        @Param({})
+        private int initNodes;
+
+        /** Hash function used to initialize the cluster. */
+        @Param({})
+        private String function;
+
+        /** Name of the algorithm to benchmark. */
+        @Param({})
+        private String algorithm;
+
+        /** Fraction of initial nodes to remove. */
+        @Param({})
+        private float removalRate;
+
+        /** Fraction of removal list shuffled at each index. */
+        @Param({})
+        private float windowDistance;
+
+        /** Number of deterministic record IDs used for mapping comparison. */
+        @Param({})
+        private int recordCount;
+
+        /** Seed used to choose removed nodes and generate variant orders. */
+        @Param({})
+        private long seed;
+
+        /** Factory used to create consistent hash instances. */
+        private ConsistentHashFactory factory;
+
+        /** Hash function used by the benchmark. */
+        private HashFunction hashFunction;
+
+        /** Initial nodes used by the benchmark. */
+        private List<Node> nodes;
+
+        /** Baseline removal order. */
+        private List<Node> baselineOrder;
+
+        /** Variant removal orders keyed by shuffled window index. */
+        private Map<Integer,List<Node>> variants;
+
+        /** Records to compare. */
+        private List<String> records;
+
+        /** Whether this algorithm can run this benchmark. */
+        private boolean supported;
+
+        /**
+         * Setups config values before running the benchmark.
+         *
+         * @param wrapper automatically populated JMH config wrapper
+         */
+        @Setup
+        public void setup( JMHConfigWrapper wrapper )
+        {
+
+            final AlgorithmConfig algorithmConfig = BenchmarkExecutionUtils.getAlgorithmConfig( wrapper.getConfig(), algorithm );
+
+            this.factory = BenchmarkExecutionUtils.getFactory( algorithmConfig );
+            this.hashFunction = HashFunctionLoader.getInstance().load( function );
+            this.nodes = SimpleNode.create( initNodes );
+            this.records = generateRecords( recordCount );
+
+            final ConsistentHash probe = factory.createConsistentHash( hashFunction, nodes );
+            this.supported = ! probe.supportsOnlyLifoRemovals();
+            if( ! supported )
+            {
+                logger.info( "Skipping " + algorithm + " because it only supports LIFO removals" );
+                this.baselineOrder = Collections.emptyList();
+                this.variants = Collections.emptyMap();
+                return;
+            }
+
+            final int removedNodesCount = (int)( initNodes * removalRate );
+            if( removedNodesCount <= 0 )
+            {
+                this.baselineOrder = Collections.emptyList();
+                this.variants = Collections.emptyMap();
+                return;
+            }
+
+            final Random random = new Random( seed );
+            this.baselineOrder = sampleNodes( nodes, removedNodesCount, random );
+            this.variants = generateRemovalOrders( baselineOrder, windowDistance, random );
+
+        }
+
+        /**
+         * Computes the average disagreement across all generated removal-order variants.
+         *
+         * @return average failure rate for the configured parameter combination
+         */
+        @Benchmark
+        public double disagreement()
+        {
+
+            if( ! supported || variants.isEmpty() )
+                return 0;
+
+            double total = 0;
+            for( Map.Entry<Integer,List<Node>> variant : variants.entrySet() )
+            {
+
+                final Metrics metrics = collectMetrics(
+                    hashFunction, factory, nodes, baselineOrder, removalRate, windowDistance,
+                    variant.getKey(), variant.getValue(), records
+                );
+                total += metrics.failureRate();
+
+            }
+
+            return total / variants.size();
+
+        }
 
     }
 

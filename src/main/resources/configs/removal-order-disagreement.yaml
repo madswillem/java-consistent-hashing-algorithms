@@ -16,9 +16,9 @@ benchmarks:
   - name: removal-order-disagreement
     args:
       # Fraction of initial nodes to remove before comparing mappings.
-      removal-rate: 0.75
+      removal-rate: [0.25, 0.5, 0.75]
       # Fraction of the removal list shuffled at each tested start index.
-      window-distance: 0.5
+      window-distance: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
       # Number of deterministic record IDs used for mapping comparison.
       record-count: 100000
       # Seed used to choose removed nodes and generate variant orders.

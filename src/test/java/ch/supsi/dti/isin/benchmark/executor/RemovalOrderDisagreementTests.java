@@ -24,6 +24,8 @@ import ch.supsi.dti.isin.benchmark.adapter.ConsistentHashFactoryLoader;
 import ch.supsi.dti.isin.benchmark.config.AlgorithmConfig;
 import ch.supsi.dti.isin.benchmark.config.BenchmarkConfig;
 import ch.supsi.dti.isin.benchmark.config.CommonConfig;
+import ch.supsi.dti.isin.benchmark.config.Config;
+import ch.supsi.dti.isin.benchmark.config.ConfigLoader;
 import ch.supsi.dti.isin.benchmark.config.ValuePath;
 
 /**
@@ -94,32 +96,24 @@ public class RemovalOrderDisagreementTests
     {
 
         final Path outputFolder = Files.createTempDirectory( "removal-order-disagreement-" + UUID.randomUUID() );
-        final CommonConfig common = CommonConfig.of(
-            ValuePath.root().append("common"),
-            Map.of(
-                "gc", false,
-                "output-folder", outputFolder.toString(),
-                "init-nodes", List.of(8),
-                "hash-functions", List.of("xx")
-            )
+        final Config config = ConfigLoader.of(
+            "common:\n" +
+            "  gc: false\n" +
+            "  output-folder: " + outputFolder + "\n" +
+            "  init-nodes: [8]\n" +
+            "  hash-functions: [xx]\n" +
+            "algorithms:\n" +
+            "  - name: anchor\n" +
+            "benchmarks:\n" +
+            "  - name: removal-order-disagreement\n" +
+            "    args:\n" +
+            "      removal-rate: [0.5]\n" +
+            "      window-distance: [0.5]\n" +
+            "      record-count: 20\n" +
+            "      seed: 1\n"
         );
-        final BenchmarkConfig benchmark = BenchmarkConfig.of(
-            ValuePath.root().append("benchmarks").append(0),
-            common,
-            Map.of(
-                "name", "removal-order-disagreement",
-                "args", Map.of(
-                    "removal-rate", 0.5,
-                    "window-distance", 0.5,
-                    "record-count", 20,
-                    "seed", 1
-                )
-            )
-        );
-        final AlgorithmConfig algorithm = AlgorithmConfig.of(
-            ValuePath.root().append("algorithms").append(0),
-            Map.of( "name", "anchor" )
-        );
+        final BenchmarkConfig benchmark = config.getBenchmarks().get( 0 );
+        final AlgorithmConfig algorithm = config.getAlgorithms().get( 0 );
         final ConsistentHashFactory factory = ConsistentHashFactoryLoader.getInstance().load( "anchor", algorithm );
 
         final RemovalOrderDisagreement executor = new RemovalOrderDisagreement( benchmark );
@@ -129,19 +123,10 @@ public class RemovalOrderDisagreementTests
         assertTrue( Files.exists(results) );
 
         final List<String> lines = Files.readAllLines( results );
-        assertEquals( "HashFunction,Algorithm,Nodes,RemovedNodes,RecordCount,RemovalRate,WindowDistance,Index,Mismatches,FailureRate", lines.get(0) );
-        assertEquals( 4, lines.size() );
-        for( int i = 1; i < lines.size(); ++i )
-        {
-
-            final String[] values = lines.get(i).split( "," );
-            assertEquals( "XX", values[0] );
-            assertEquals( "anchor", values[1] );
-            assertEquals( "8", values[2] );
-            assertEquals( "4", values[3] );
-            assertEquals( "20", values[4] );
-
-        }
+        assertTrue( lines.size() > 1 );
+        assertTrue( lines.get(0).contains("Benchmark") );
+        assertTrue( lines.get(0).contains("Param: removalRate") );
+        assertTrue( lines.get(0).contains("Param: windowDistance") );
 
     }
 
