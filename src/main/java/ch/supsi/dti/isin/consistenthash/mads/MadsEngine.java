@@ -45,7 +45,7 @@ public class MadsEngine implements BucketBasedEngine {
      * @param hashFunction the hash function to use
      */
     public MadsEngine(int size, int capacity, HashFunction hashFunction) {
-        this(size, capacity, hashFunction, new TreeSetRemovedBuckets());
+        this(size, capacity, hashFunction, new OrderedHashRemovedBuckets());
     }
 
     /**

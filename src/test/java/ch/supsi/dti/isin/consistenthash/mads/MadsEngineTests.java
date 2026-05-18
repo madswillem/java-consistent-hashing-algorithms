@@ -172,17 +172,13 @@ public class MadsEngineTests
     }
 
     @Test
-    public void adding_after_multiple_removals_should_restore_removed_buckets_in_ascending_order()
+    public void adding_after_multiple_removals_should_restore_buckets_independently_of_removal_order()
     {
 
-        final MadsEngine engine = new MadsEngine( 10, 20, ConsistentHash.DEFAULT_HASH_FUNCTION );
-        final List<Integer> removed = List.of( 7, 2, 5, 1 );
-        removed.forEach( engine::removeBucket );
+        final List<Integer> firstOrder = List.of( 7, 2, 5, 1 );
+        final List<Integer> secondOrder = List.of( 1, 5, 2, 7 );
 
-        assertEquals( 1, engine.addBucket() );
-        assertEquals( 2, engine.addBucket() );
-        assertEquals( 5, engine.addBucket() );
-        assertEquals( 7, engine.addBucket() );
+        assertEquals( restoreRemovedBuckets( firstOrder ), restoreRemovedBuckets( secondOrder ) );
 
     }
 
@@ -406,6 +402,17 @@ public class MadsEngineTests
         Collections.shuffle( values );
         
         return values.subList( 0, removeSize );
+
+    }
+
+
+    private List<Integer> restoreRemovedBuckets( List<Integer> removed )
+    {
+
+        final MadsEngine engine = new MadsEngine( 10, 20, ConsistentHash.DEFAULT_HASH_FUNCTION );
+        removed.forEach( engine::removeBucket );
+
+        return IntStream.range( 0, removed.size() ).map( ignored -> engine.addBucket() ).boxed().collect( toList() );
 
     }
 
